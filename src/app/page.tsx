@@ -1,5 +1,10 @@
-import { Button } from "@mantine/core";
+import { SignIn } from "@/components/sign-in";
+import { Container } from "@mantine/core";
 
 export default function Home() {
-  return <Button>Hello World</Button>;
+  return (
+    <Container size="xs">
+      <SignIn />
+    </Container>
+  );
 }
