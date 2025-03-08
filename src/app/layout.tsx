@@ -7,8 +7,8 @@ import {
 } from "@mantine/core";
 
 export const metadata = {
-  title: "My Mantine app",
-  description: "I have followed setup instructions carefully",
+  title: "Emilie et Kevin - 17.05.2025",
+  description: "Emilie et Kevin se marient le 17.05.2025",
 };
 
 export default function RootLayout({
