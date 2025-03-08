@@ -5,6 +5,7 @@ import {
   MantineProvider,
   mantineHtmlProps,
 } from "@mantine/core";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SessionProvider } from "next-auth/react";
 
 export const metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({
       </head>
       <body>
         <SessionProvider>
+          <SpeedInsights />
           <MantineProvider>{children}</MantineProvider>
         </SessionProvider>
       </body>
