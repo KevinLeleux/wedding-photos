@@ -5,6 +5,7 @@ import {
   MantineProvider,
   mantineHtmlProps,
 } from "@mantine/core";
+import { SessionProvider } from "next-auth/react";
 
 export const metadata = {
   title: "Emilie et Kevin - 17.05.2025",
@@ -24,7 +25,9 @@ export default function RootLayout({
         <ColorSchemeScript />
       </head>
       <body>
-        <MantineProvider>{children}</MantineProvider>
+        <SessionProvider>
+          <MantineProvider>{children}</MantineProvider>
+        </SessionProvider>
       </body>
     </html>
   );
