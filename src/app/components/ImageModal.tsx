@@ -69,8 +69,8 @@ export default function ImageModal({
           <Image
             src={image.url}
             alt={image.key}
-            width={image.width || 800}
-            height={image.height || 600}
+            width={image.width || 1200}
+            height={image.height || 800}
             style={{
               width: "100%",
               height: "auto",
@@ -79,9 +79,7 @@ export default function ImageModal({
               borderRadius: "20px",
               display: imageLoading ? "none" : "block",
             }}
-            loading="lazy"
-            quality={70}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 300px"
+            quality={50}
           />
         )}
 

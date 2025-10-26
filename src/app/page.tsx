@@ -1,129 +1,92 @@
 "use client";
 
-import { ImageData, ImageWithDimensions, PaginationData } from "@/types/image";
+import { ImageData, ImageWithDimensions } from "@/types/image";
 import { Card, Center, Grid, Loader, Stack, Title } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ImageModal from "./components/ImageModal";
 import Pagination from "./components/Pagination";
 
 export default function Home() {
-  const [images, setImages] = useState<ImageWithDimensions[]>([]);
-  const [loading, setLoading] = useState(true);
   const itemsPerPage = 50;
   const [currentPage, setCurrentPage] = useState(1);
-  const [paginationData, setPaginationData] = useState<PaginationData | null>(
-    null
-  );
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedImage, setSelectedImage] =
     useState<ImageWithDimensions | null>(null);
+  const [paginationInfo, setPaginationInfo] = useState<{
+    total: number;
+    totalPages: number;
+  } | null>(null);
 
-  const imageCache = useRef<
-    Map<
-      number,
-      { images: ImageWithDimensions[]; paginationData: PaginationData }
-    >
-  >(new Map());
+  const { data, isLoading } = useQuery({
+    queryKey: ["images", currentPage, itemsPerPage],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/images?page=${currentPage}&limit=${itemsPerPage}`
+      );
+      if (!response.ok) {
+        throw new Error("Erreur lors du chargement des images");
+      }
+      const data = await response.json();
 
-  const fetchImages = useCallback(
-    async (page: number = 1) => {
-      try {
-        const cachedData = imageCache.current.get(page);
-        if (cachedData) {
-          const hasDimensions = cachedData.images.every(
-            (img) => img.width && img.height && img.isHorizontal !== undefined
-          );
-          if (hasDimensions) {
-            setImages(cachedData.images);
-            setPaginationData(cachedData.paginationData);
-            setLoading(false);
-            return;
-          }
-        }
+      const imagesWithDimensions = await Promise.all(
+        data.images.map(async (image: ImageData) => {
+          return new Promise<ImageWithDimensions>((resolve) => {
+            const img = new window.Image();
+            img.onload = () => {
+              resolve({
+                ...image,
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                isHorizontal: img.naturalWidth > img.naturalHeight,
+              });
+            };
+            img.onerror = () => {
+              resolve({
+                ...image,
+                width: 400,
+                height: 400,
+                isHorizontal: false,
+              });
+            };
+            img.src = image.url;
+          });
+        })
+      );
 
-        setLoading(true);
-        const response = await fetch(
-          `/api/images?page=${page}&limit=${itemsPerPage}`
-        );
-        if (!response.ok) {
-          throw new Error("Erreur lors du chargement des images");
-        }
-        const data = await response.json();
-
-        const imagesWithDimensions = await Promise.all(
-          data.images.map(async (image: ImageData) => {
-            return new Promise<ImageWithDimensions>((resolve) => {
-              const img = new window.Image();
-              img.onload = () => {
-                resolve({
-                  ...image,
-                  width: img.naturalWidth,
-                  height: img.naturalHeight,
-                  isHorizontal: img.naturalWidth > img.naturalHeight,
-                });
-              };
-              img.onerror = () => {
-                resolve({
-                  ...image,
-                  width: 300,
-                  height: 400,
-                  isHorizontal: false,
-                });
-              };
-              img.src = image.url;
-            });
-          })
-        );
-
-        setImages(imagesWithDimensions);
-        const paginationInfo = {
+      return {
+        images: imagesWithDimensions,
+        paginationData: {
           total: data.total,
           page: data.page,
           limit: data.limit,
           totalPages: data.totalPages,
           hasNext: data.hasNext,
           hasPrev: data.hasPrev,
-        };
-        setPaginationData(paginationInfo);
-
-        const cacheImages = imagesWithDimensions.map((img) => ({
-          ...img,
-          width: img.isHorizontal ? 400 : 300,
-          height: img.isHorizontal ? 267 : 400,
-        }));
-        imageCache.current.set(page, {
-          images: cacheImages,
-          paginationData: paginationInfo,
-        });
-      } catch (err) {
-        console.error("Erreur lors du chargement des images:", err);
-      } finally {
-        setLoading(false);
-      }
+        },
+      };
     },
-    [itemsPerPage]
-  );
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+  });
 
+  // Mettre à jour les informations de pagination quand les données changent
   useEffect(() => {
-    fetchImages(currentPage);
-  }, [fetchImages, currentPage]);
+    if (data?.paginationData) {
+      setPaginationInfo({
+        total: data.paginationData.total,
+        totalPages: data.paginationData.totalPages,
+      });
+    }
+  }, [data?.paginationData]);
 
   const handlePageChange = useCallback((page: number) => {
     // Mettre à jour immédiatement la page courante
     setCurrentPage(page);
 
     // Vérifier si on a déjà cette page en cache
-    const cachedData = imageCache.current.get(page);
-    if (cachedData) {
-      // Page en cache - affichage instantané
-      setImages(cachedData.images);
-      setPaginationData(cachedData.paginationData);
-      return;
-    }
 
-    // Page pas en cache - activer le loading
-    setLoading(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
@@ -160,34 +123,34 @@ export default function Home() {
   // Navigation entre les images
   const navigateToImage = useCallback(
     (imageIndex: number) => {
-      if (imageIndex >= 0 && imageIndex < images.length) {
-        const newImage = images[imageIndex];
+      if (data && imageIndex >= 0 && imageIndex < data.images.length) {
+        const newImage = data.images[imageIndex];
         setSelectedImage(newImage);
         setModalOpened(true);
       }
     },
-    [images]
+    [data]
   );
 
   const goToPreviousImage = useCallback(() => {
-    if (!selectedImage) return;
-    const currentIndex = images.findIndex(
+    if (!selectedImage || !data) return;
+    const currentIndex = data.images.findIndex(
       (img) => img.key === selectedImage.key
     );
     if (currentIndex > 0) {
       navigateToImage(currentIndex - 1);
     }
-  }, [selectedImage, images, navigateToImage]);
+  }, [selectedImage, data, navigateToImage]);
 
   const goToNextImage = useCallback(() => {
-    if (!selectedImage) return;
-    const currentIndex = images.findIndex(
+    if (!selectedImage || !data) return;
+    const currentIndex = data.images.findIndex(
       (img) => img.key === selectedImage.key
     );
-    if (currentIndex < images.length - 1) {
+    if (currentIndex < data.images.length - 1) {
       navigateToImage(currentIndex + 1);
     }
-  }, [selectedImage, images, navigateToImage]);
+  }, [selectedImage, data, navigateToImage]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -221,10 +184,6 @@ export default function Home() {
     closeModal,
   ]);
 
-  useEffect(() => {
-    imageCache.current.clear();
-  }, []);
-
   return (
     <Stack h="100vh">
       <Stack py="xl">
@@ -234,17 +193,17 @@ export default function Home() {
           mb="sm">
           Notre mariage - Émilie & Kevin
         </Title>
-        {paginationData && paginationData.totalPages > 1 && (
+        {paginationInfo && paginationInfo.totalPages > 1 && (
           <Pagination
             currentPage={currentPage}
-            totalPages={paginationData.totalPages}
-            totalItems={paginationData.total}
-            itemsPerPage={paginationData.limit}
+            totalPages={paginationInfo.totalPages}
+            totalItems={paginationInfo.total}
+            itemsPerPage={itemsPerPage}
             onPageChange={handlePageChange}
-            disabled={loading}
+            disabled={isLoading}
           />
         )}
-        {loading ? (
+        {isLoading ? (
           <Center h="50vh">
             <Loader size="lg" />
           </Center>
@@ -254,7 +213,7 @@ export default function Home() {
             justify="center"
             mx="auto"
             maw="1600px">
-            {images.map((image) => (
+            {data?.images.map((image) => (
               <Grid.Col
                 key={image.key}
                 span={
@@ -269,8 +228,8 @@ export default function Home() {
                     onClick={() => openModal(image)}
                     src={image.url}
                     alt={image.key}
-                    width={image.isHorizontal ? 400 : 300}
-                    height={image.isHorizontal ? 267 : 400}
+                    width={image.isHorizontal ? 500 : 400}
+                    height={image.isHorizontal ? 333 : 400}
                     style={{
                       cursor: "pointer",
                       width: "100%",
@@ -279,9 +238,7 @@ export default function Home() {
                       objectFit: "cover",
                       maxHeight: image.isHorizontal ? "400px" : "400px",
                     }}
-                    loading="lazy"
                     quality={40}
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 300px"
                   />
                 </Card>
               </Grid.Col>
@@ -289,14 +246,14 @@ export default function Home() {
           </Grid>
         )}
 
-        {paginationData && paginationData.totalPages > 1 && (
+        {paginationInfo && paginationInfo.totalPages > 1 && (
           <Pagination
             currentPage={currentPage}
-            totalPages={paginationData.totalPages}
-            totalItems={paginationData.total}
-            itemsPerPage={paginationData.limit}
+            totalPages={paginationInfo.totalPages}
+            totalItems={paginationInfo.total}
+            itemsPerPage={itemsPerPage}
             onPageChange={handlePageChange}
-            disabled={loading}
+            disabled={isLoading}
           />
         )}
       </Stack>
@@ -309,14 +266,14 @@ export default function Home() {
         onPrevious={goToPreviousImage}
         onNext={goToNextImage}
         hasPrevious={
-          selectedImage
-            ? images.findIndex((img) => img.key === selectedImage.key) > 0
+          selectedImage && data
+            ? data.images.findIndex((img) => img.key === selectedImage.key) > 0
             : false
         }
         hasNext={
-          selectedImage
-            ? images.findIndex((img) => img.key === selectedImage.key) <
-              images.length - 1
+          selectedImage && data
+            ? data.images.findIndex((img) => img.key === selectedImage.key) <
+              data.images.length - 1
             : false
         }
       />

@@ -5,6 +5,7 @@ import {
   mantineHtmlProps,
   MantineProvider,
 } from "@mantine/core";
+import { Providers } from "./providers";
 
 import type { Metadata } from "next";
 
@@ -26,13 +27,15 @@ export default function RootLayout({
         <ColorSchemeScript />
       </head>
       <body style={{ backgroundColor: "#f8f9fa" }}>
-        <MantineProvider
-          theme={{
-            primaryColor: "pink",
-            fontFamily: "Inter, sans-serif",
-          }}>
-          {children}
-        </MantineProvider>
+        <Providers>
+          <MantineProvider
+            theme={{
+              primaryColor: "pink",
+              fontFamily: "Inter, sans-serif",
+            }}>
+            {children}
+          </MantineProvider>
+        </Providers>
       </body>
     </html>
   );
